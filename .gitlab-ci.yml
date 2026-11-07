@@ -1,0 +1,44 @@
+stages:
+  - verify
+
+default:
+  image: node:22-bookworm
+  interruptible: true
+
+variables:
+  POSTGRES_DB: penocracy_test
+  POSTGRES_USER: penocracy
+  POSTGRES_PASSWORD: penocracy
+  DATABASE_URL: postgresql://penocracy:penocracy@postgres:5432/penocracy_test
+  DIRECT_URL: postgresql://penocracy:penocracy@postgres:5432/penocracy_test
+  TEST_DATABASE_URL: postgresql://penocracy:penocracy@postgres:5432/penocracy_test
+  AUTH_SECRET: ci-secret
+  EXPORT_MODE: inline
+  FF_NETWORK_PER_BUILD: "1"
+
+verify:
+  stage: verify
+  services:
+    - name: postgres:16
+      alias: postgres
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends openjdk-21-jre-headless curl xz-utils unzip ca-certificates
+    - curl -fsSL -o /tmp/typst.tar.xz https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz
+    - tar -xf /tmp/typst.tar.xz -C /tmp
+    - mv /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst
+    - curl -fsSL -o /tmp/epubcheck.zip https://github.com/w3c/epubcheck/releases/download/v5.4.0/epubcheck-5.4.0.zip
+    - unzip -q /tmp/epubcheck.zip -d /opt
+    - export EPUBCHECK_JAR=/opt/epubcheck-5.4.0/epubcheck.jar
+    - npm ci
+    - npx prisma migrate deploy
+  script:
+    - npm run typecheck
+    - npm run lint
+    - npm test
+    - npm run test:integration
+    - npm run build
+  cache:
+    key: npm
+    paths:
+      - node_modules/

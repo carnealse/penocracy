@@ -1,0 +1,16 @@
+import { json } from "@/lib/http";
+import { addBookmark, listBookmarks } from "@/server/manuscript";
+import { guard } from "@/server/guard";
+
+export async function GET(request: Request) {
+  const bookId = new URL(request.url).searchParams.get("bookId");
+  if (!bookId) return json({ error: "Missing book." }, 400);
+  return guard(async (userId) => json(await listBookmarks(userId, bookId)));
+}
+
+export async function POST(request: Request) {
+  return guard(async (userId) => {
+    const body = await request.json();
+    return json(await addBookmark(userId, body.chapterId, { id: body.id, label: body.label }));
+  });
+}

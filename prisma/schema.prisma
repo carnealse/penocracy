@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  preference   Preference?
+  books        Book[]
+  objects      StoredObject[]
+  exportJobs   ExportJob[]
+  presets      ExportPreset[]
+}
+
+model Preference {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+model Book {
+  id             String          @id @default(cuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  sortTitle      String
+  authorName     String?
+  coverColor     String          @default("#6b4423")
+  coverObjectKey String?
+  pinned         Boolean         @default(false)
+  deletedAt      DateTime?
+  lastEditedAt   DateTime        @default(now())
+  lastChapterId  String?
+  lastCursor     Json?
+  schemaVersion  Int             @default(1)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  parts          Part[]
+  chapters       Chapter[]
+  revisions      Revision[]
+  archives       ArchiveRecord[]
+  comments       Comment[]
+  bookmarks      Bookmark[]
+  jobs           ExportJob[]
+
+  @@index([userId, deletedAt])
+  @@index([userId, lastEditedAt])
+}
+
+model Part {
+  id        String    @id @default(cuid())
+  bookId    String
+  book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  title     String
+  kind      PartKind
+  sortOrder Int
+  deletedAt DateTime?
+  chapters  Chapter[]
+
+  @@index([bookId, sortOrder])
+}
+
+model Chapter {
+  id           String     @id @default(cuid())
+  bookId       String
+  book         Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  partId       String?
+  part         Part?      @relation(fields: [partId], references: [id])
+  title        String
+  showHeading  Boolean    @default(true)
+  numberMode   String     @default("auto")
+  customNumber String?
+  sortOrder    Int
+  content      Json
+  contentHash  String
+  revision     Int        @default(1)
+  wordCount    Int        @default(0)
+  archivedAt   DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  scenes       Scene[]
+  comments     Comment[]
+  bookmarks    Bookmark[]
+
+  @@index([bookId, archivedAt, sortOrder])
+  @@index([partId, sortOrder])
+}
+
+model Scene {
+  id        String  @id
+  chapterId String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int
+  wordCount Int     @default(0)
+
+  @@index([chapterId, sortOrder])
+}
+
+model ContentBlob {
+  hash      String   @id
+  data      Bytes
+  byteSize  Int
+  createdAt DateTime @default(now())
+}
+
+model Revision {
+  id         String       @id @default(cuid())
+  bookId     String
+  book       Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapterId  String?
+  blobHash   String
+  parentHash String?
+  groupId    String?
+  kind       RevisionKind
+  label      String?
+  wordCount  Int
+  createdAt  DateTime     @default(now())
+
+  @@index([bookId, createdAt])
+  @@index([chapterId, createdAt])
+  @@index([groupId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapterId String
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  body      String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chapterId])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapterId String
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  label     String
+  createdAt DateTime @default(now())
+
+  @@index([chapterId])
+}
+
+model ArchiveRecord {
+  id                String        @id @default(cuid())
+  userId            String
+  bookId            String
+  book              Book          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  entityType        ArchiveEntity
+  entityId          String
+  title             String
+  bookTitle         String
+  location          String
+  preview           String
+  wordCount         Int
+  payload           Json
+  originalParentId  String?
+  previousSiblingId String?
+  nextSiblingId     String?
+  archivedAt        DateTime      @default(now())
+  contentUpdatedAt  DateTime
+
+  @@index([userId, archivedAt])
+  @@index([bookId, entityType])
+}
+
+model ExportPreset {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  format    ExportFormat
+  data      Json
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([userId])
+}
+
+model ExportJob {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId            String
+  book              Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  groupId           String
+  format            ExportFormat
+  preset            Json
+  status            ExportStatus @default(QUEUED)
+  error             String?
+  artifactKey       String?
+  validation        Json?
+  revisionCreatedAt DateTime
+  createdAt         DateTime     @default(now())
+  finishedAt        DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model StoredObject {
+  key         String   @id
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentType String
+  fileName    String
+  data        Bytes
+  createdAt   DateTime @default(now())
+}
+
+enum PartKind {
+  FRONT
+  BODY
+  BACK
+}
+
+enum RevisionKind {
+  AUTO
+  NAMED
+  MANUAL
+  PRE_RESTORE
+  PRE_IMPORT
+  PRE_ARCHIVE
+  PRE_REPLACE
+  CONFLICT
+}
+
+enum ArchiveEntity {
+  BOOK
+  PART
+  CHAPTER
+  SCENE
+}
+
+enum ExportFormat {
+  PDF
+  EPUB
+  DOCX
+}
+
+enum ExportStatus {
+  QUEUED
+  RUNNING
+  READY
+  FAILED
+}
