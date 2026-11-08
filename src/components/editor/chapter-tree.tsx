@@ -4,7 +4,6 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
-  closestCenter,
   pointerWithin,
   useDroppable,
   useSensor,
@@ -80,12 +79,14 @@ export function ChapterTree({
         const pointer = pointerWithin(args);
         const dock = pointer.find((hit) => hit.id === "archive-drop" || hit.id === "destroy-drop");
         if (dock) return [dock];
+        const chapterHit = pointer.find((hit) => {
+          const id = String(hit.id);
+          return id !== "archive-drop" && id !== "destroy-drop" && !id.startsWith("part:");
+        });
+        if (chapterHit) return [chapterHit];
         const partHit = pointer.find((hit) => String(hit.id).startsWith("part:"));
         if (partHit) return [partHit];
-        return closestCenter({
-          ...args,
-          droppableContainers: args.droppableContainers.filter((container) => container.id !== "archive-drop" && container.id !== "destroy-drop"),
-        });
+        return [];
       }}
       onDragStart={(event: DragStartEvent) => setDraggingId(String(event.active.id))}
       onDragOver={(event) => {
