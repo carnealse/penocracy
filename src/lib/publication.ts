@@ -6,7 +6,7 @@ export type Inline =
   | { type: "break" };
 
 export type Block =
-  | { type: "paragraph"; align?: string; inlines: Inline[] }
+  | { type: "paragraph"; align?: string; inlines: Inline[]; indent: boolean; blank: boolean }
   | { type: "heading"; level: number; inlines: Inline[] }
   | { type: "blockquote"; blocks: Block[] }
   | { type: "list"; ordered: boolean; items: Inline[][] }
@@ -103,16 +103,32 @@ export function blocksFromDoc(doc: PMDoc): Block[] {
   const nodes = scenes.length > 0 ? scenes : [{ type: "scene", attrs: { title: "" }, content: top }];
   nodes.forEach((scene, index) => {
     const title = String(scene.attrs?.title ?? "").trim();
-    if (index > 0) blocks.push({ type: "sceneBreak" });
     if (title && !DEFAULT_SCENE.test(title)) blocks.push({ type: "sceneTitle", text: title });
     for (const child of scene.content ?? []) blocks.push(...nodeToBlocks(child));
   });
-  return blocks;
+  return applyParagraphLayout(blocks);
+}
+
+/** First paragraph of a chapter, and the first paragraph after an explicit scene break, are flush. A blank line does not change the indent of the paragraph after it. */
+export function applyParagraphLayout(blocks: Block[]): Block[] {
+  let suppressIndent = true;
+  return blocks.map((block) => {
+    if (block.type === "heading" || block.type === "sceneBreak") {
+      suppressIndent = true;
+      return block;
+    }
+    if (block.type !== "paragraph") return block;
+    const blank = inlineText(block.inlines).trim().length === 0;
+    const indent = !suppressIndent && !blank;
+    if (suppressIndent) suppressIndent = false;
+    return { ...block, blank, indent };
+  });
 }
 
 function nodeToBlocks(node: PMNode): Block[] {
   if (node.type === "paragraph") {
-    return [{ type: "paragraph", align: alignOf(node), inlines: inlinesOf(node) }];
+    const inlines = inlinesOf(node);
+    return [{ type: "paragraph", align: alignOf(node), inlines, indent: true, blank: false }];
   }
   if (node.type === "heading") {
     return [{ type: "heading", level: Number(node.attrs?.level ?? 2), inlines: inlinesOf(node) }];

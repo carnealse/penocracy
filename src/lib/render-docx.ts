@@ -157,11 +157,12 @@ export async function renderDocx(publication: Publication, options: ExportOption
   return Buffer.from(await Packer.toBuffer(doc));
 }
 
-function lineSpacing(options: ExportOptions) {
+function novelSpacing() {
   return {
-    line: Math.round(options.lineHeight * 240),
+    before: 0,
+    after: 0,
+    line: 276,
     lineRule: "auto" as const,
-    after: options.indent ? 0 : 160,
   };
 }
 
@@ -173,7 +174,7 @@ function blockToParagraphs(
   nextId: () => number,
 ): Paragraph[] {
   if (block.type === "paragraph") {
-    return [paragraph(inlinesToRuns(block.inlines, font, footnotes, nextId), options, font, alignment(block.align))];
+    return [paragraph(inlinesToRuns(block.inlines, font, footnotes, nextId), options, font, alignment(block.align), block.indent, block.blank)];
   }
   if (block.type === "heading") {
     return [
@@ -203,7 +204,7 @@ function blockToParagraphs(
             ...(block.ordered ? [] : [new TextRun({ text: "• ", font })]),
             ...inlinesToRuns(item, font, footnotes, nextId),
           ],
-          spacing: lineSpacing(options),
+          spacing: novelSpacing(),
           ...(index === 0 ? {} : {}),
         }),
     );
@@ -231,13 +232,13 @@ function blockToParagraphs(
   return [];
 }
 
-function paragraph(children: TextRun[], options: ExportOptions, font: string, align?: (typeof AlignmentType)[keyof typeof AlignmentType]): Paragraph {
+function paragraph(children: TextRun[], options: ExportOptions, font: string, align: ReturnType<typeof alignment>, indented: boolean, blank: boolean): Paragraph {
   const config: IParagraphOptions = {
     style: "Normal",
-    spacing: lineSpacing(options),
-    indent: options.indent ? { firstLine: 720 } : undefined,
+    spacing: novelSpacing(),
+    indent: indented ? { firstLine: 360 } : { firstLine: 0 },
     alignment: align ?? (options.justify ? AlignmentType.JUSTIFIED : AlignmentType.LEFT),
-    children: children.length > 0 ? children : [new TextRun({ text: "", font })],
+    children: blank || children.length === 0 ? [new TextRun({ text: "\u00A0", font })] : children,
   };
   return new Paragraph(config);
 }

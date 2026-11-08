@@ -53,9 +53,7 @@ export function WritingSurface({
         padding: `${preferences.pageMargin}px`,
         fontFamily: font,
         fontSize: preferences.fontSize,
-        lineHeight: preferences.lineHeight,
         textAlign: preferences.align,
-        ["--paragraph-space" as string]: `${preferences.paragraphSpacing}px`,
       }}
     >
       {number && <p className="chapter-kicker">{number}</p>}

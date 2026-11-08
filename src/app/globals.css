@@ -235,12 +235,25 @@ button { cursor: pointer; }
 .chapter-heading { margin: 0 0 36px; text-align: center; font-family: var(--font-serif), serif; font-weight: 500; font-size: 32px; color: #8b98a1; }
 [data-theme="dark"] .chapter-heading, [data-theme="dark"] .chapter-kicker { color: #8b98a1; }
 .writing-prose { outline: none; min-height: 50vh; }
-.writing-prose p { margin: 0; }
-.writing-prose p + p { margin-top: var(--paragraph-space, 0.9em); }
-.writing-prose p.is-empty::before { content: attr(data-placeholder); color: #9aa6ae; float: left; height: 0; pointer-events: none; }
-.writing-prose h1, .writing-prose h2 { font-family: var(--font-serif), serif; }
+.writing-prose p {
+  margin: 0;
+  padding: 0;
+  line-height: 1.15;
+  text-indent: 0.25in;
+}
+.writing-prose > p:first-of-type,
+.writing-prose > .scene-block:first-child > p:first-of-type,
+.writing-prose .scene-break + p,
+.writing-prose h1 + p,
+.writing-prose h2 + p,
+.writing-prose h3 + p,
+.writing-prose li p {
+  text-indent: 0;
+}
+.writing-prose p.is-empty::before { content: attr(data-placeholder); color: #9aa6ae; float: left; height: 0; pointer-events: none; text-indent: 0; }
+.writing-prose h1, .writing-prose h2 { font-family: var(--font-serif), serif; text-indent: 0; }
+.scene-break { text-align: center; letter-spacing: 0.4em; margin: 0.75em 0; color: var(--muted-foreground); text-indent: 0; }
 .scene-label { font-family: var(--font-sans), sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted-foreground); margin-top: 1.4em; }
-.scene-break { text-align: center; letter-spacing: 0.4em; margin: 1.4em 0; color: var(--muted-foreground); }
 .footnote-chip { font-size: 0.75em; vertical-align: super; color: var(--accent); }
 
 .dim-layer { position: fixed; inset: 0; background: rgb(0 0 0 / 28%); z-index: 30; pointer-events: none; }

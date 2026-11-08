@@ -14,7 +14,7 @@ export function publicationToTypst(publication: Publication, options: ExportOpti
   const lines: string[] = [
     `#set document(title: ${typstString(publication.title)}, author: ${typstString(publication.author)})`,
     `#set text(font: ${typstString(font)}, size: ${options.fontSize}pt, lang: ${typstString(publication.language)}, costs: (widow: 100%, orphan: 100%))`,
-    `#set par(justify: ${options.justify}, first-line-indent: ${options.indent ? "1.25em" : "0em"}, leading: ${(options.lineHeight * 0.55).toFixed(2)}em)`,
+    `#set par(justify: ${options.justify}, first-line-indent: 0.25in, leading: 0.15em, spacing: 0pt)`,
     `#set page(${paper}`,
     `  margin: (inside: ${inside}in, outside: ${outside}in, top: ${options.marginIn}in, bottom: ${options.marginIn}in),`,
     options.pageNumbers ? `  numbering: "1",` : "",
@@ -58,9 +58,11 @@ export function publicationToTypst(publication: Publication, options: ExportOpti
 
 function blockToTypst(block: Block, options: ExportOptions): string {
   if (block.type === "paragraph") {
+    if (block.blank) return "#par(first-line-indent: 0in, spacing: 0pt)[#linebreak()]";
     const body = inlinesToTypst(block.inlines);
-    if (block.align && block.align !== "left") return `#align(${block.align})[${body}]`;
-    return body || "#parbreak()";
+    const paragraph = block.indent ? `#par[${body}]` : `#par(first-line-indent: 0in)[${body}]`;
+    if (block.align && block.align !== "left") return `#align(${block.align})[${paragraph}]`;
+    return paragraph;
   }
   if (block.type === "heading") {
     const level = Math.min(4, Math.max(2, block.level));

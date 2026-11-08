@@ -110,18 +110,25 @@ function pageShell(publication: Publication, title: string, body: string): strin
 function stylesheet(options: ExportOptions): string {
   const family = options.font === "mono" ? '"Courier Prime", "Courier New", monospace' : 'Georgia, "Palatino Linotype", serif';
   return `body { font-family: ${family}; font-size: 1em; line-height: ${options.lineHeight}; margin: 5%; }
-p { margin: 0 0 ${options.indent ? "0" : "0.8em"}; ${options.indent ? "text-indent: 1.3em;" : ""} ${options.justify ? "text-align: justify;" : ""} }
-h1 { font-size: 1.5em; text-align: center; text-indent: 0; margin: 2em 0 1em; page-break-before: always; }
-h2 { font-size: 1.2em; text-indent: 0; }
+p { margin: 0; padding: 0; line-height: 1.15; text-indent: 0.25in; ${options.justify ? "text-align: justify;" : ""} }
+p.noindent, p.blank, h1, h2, .scene { text-indent: 0; }
+p.blank { min-height: 1.15em; }
+h1 { font-size: 1.5em; text-align: center; margin: 2em 0 1em; page-break-before: always; }
+h2 { font-size: 1.2em; }
 blockquote { margin: 1em 1.4em; }
-.scene { text-align: center; text-indent: 0; margin: 1.4em 0; letter-spacing: 0.3em; }
+blockquote p { text-indent: 0; }
+.scene { text-align: center; margin: 0.75em 0; letter-spacing: 0.3em; }
 .scene-title { text-align: center; font-style: italic; text-indent: 0; }
 ol, ul { text-indent: 0; }
 a { color: inherit; }`;
 }
 
 function blockToHtml(block: Block, options: ExportOptions): string {
-  if (block.type === "paragraph") return `<p>${inlinesToHtml(block.inlines)}</p>`;
+  if (block.type === "paragraph") {
+    const cls = block.blank ? "blank" : block.indent ? "" : "noindent";
+    const body = block.blank ? "&#160;" : inlinesToHtml(block.inlines);
+    return `<p${cls ? ` class="${cls}"` : ""}>${body}</p>`;
+  }
   if (block.type === "heading") return `<h${Math.min(4, Math.max(2, block.level))}>${inlinesToHtml(block.inlines)}</h${Math.min(4, Math.max(2, block.level))}>`;
   if (block.type === "blockquote") return `<blockquote>${block.blocks.map((child) => blockToHtml(child, options)).join("")}</blockquote>`;
   if (block.type === "list") {
