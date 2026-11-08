@@ -514,6 +514,54 @@ export async function archiveChapter(userId: string, chapterId: string) {
   return { archiveId: record.id };
 }
 
+export async function destroyChapter(userId: string, chapterId: string) {
+  const chapter = await prisma.chapter.findFirst({
+    where: { id: chapterId, book: { userId } },
+    include: { book: true },
+  });
+  if (!chapter) throw new HttpError(404, "That chapter is not in the manuscript.");
+  await prisma.$transaction(async (tx) => {
+    await tx.revision.deleteMany({ where: { chapterId } });
+    await tx.archiveRecord.deleteMany({
+      where: { bookId: chapter.bookId, entityType: ArchiveEntity.CHAPTER, entityId: chapterId },
+    });
+    await tx.chapter.delete({ where: { id: chapterId } });
+    const remaining = await tx.chapter.count({ where: { bookId: chapter.bookId, archivedAt: null } });
+    if (remaining === 0) {
+      const docNext = emptyDocument();
+      const scene = extractScenes(docNext)[0];
+      const blank = await tx.chapter.create({
+        data: {
+          bookId: chapter.bookId,
+          partId: chapter.partId,
+          title: "Chapter 1",
+          sortOrder: 0,
+          content: json(docNext),
+          contentHash: hashDoc(docNext),
+          scenes: { create: [{ id: scene.id, title: scene.title, sortOrder: 0, wordCount: 0 }] },
+        },
+      });
+      await tx.book.update({
+        where: { id: chapter.bookId },
+        data: { lastChapterId: blank.id, lastEditedAt: new Date() },
+      });
+      return;
+    }
+    if (chapter.book.lastChapterId === chapterId) {
+      const next = await tx.chapter.findFirst({
+        where: { bookId: chapter.bookId, archivedAt: null },
+        orderBy: { sortOrder: "asc" },
+      });
+      await tx.book.update({
+        where: { id: chapter.bookId },
+        data: { lastChapterId: next?.id ?? null, lastEditedAt: new Date() },
+      });
+      return;
+    }
+    await tx.book.update({ where: { id: chapter.bookId }, data: { lastEditedAt: new Date() } });
+  });
+}
+
 export async function archiveScene(userId: string, chapterId: string, sceneId: string) {
   const chapter = await prisma.chapter.findFirst({
     where: { id: chapterId, archivedAt: null, book: { userId } },

@@ -27,6 +27,7 @@ export function ChapterTree({
   onOpen,
   onReorder,
   onArchive,
+  onDestroy,
   onRename,
   onAdd,
   onDuplicate,
@@ -37,12 +38,13 @@ export function ChapterTree({
   onOpen: (id: string) => void;
   onReorder: (parts: PartNav[]) => void;
   onArchive: (chapter: ChapterNav) => void;
+  onDestroy: (chapter: ChapterNav) => void;
   onRename: (chapter: ChapterNav, title: string) => void;
   onAdd: (partId: string, title?: string) => void;
   onDuplicate: (chapterId: string) => void;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [overTrash, setOverTrash] = useState(false);
+  const [overDrop, setOverDrop] = useState<string | null>(null);
   const [editing, setEditing] = useState<"FRONT" | "BACK" | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const dragging = useMemo(() => parts.flatMap((part) => part.chapters).find((chapter) => chapter.id === draggingId), [parts, draggingId]);
@@ -51,10 +53,14 @@ export function ChapterTree({
   function onDragEnd(event: DragEndEvent) {
     const current = dragging;
     setDraggingId(null);
-    setOverTrash(false);
+    setOverDrop(null);
     if (!current || !event.over) return;
-    if (event.over.id === "trash") {
+    if (event.over.id === "archive-drop") {
       onArchive(current);
+      return;
+    }
+    if (event.over.id === "destroy-drop") {
+      onDestroy(current);
       return;
     }
     const overId = String(event.over.id);
@@ -72,16 +78,22 @@ export function ChapterTree({
       sensors={sensors}
       collisionDetection={(args) => {
         const pointer = pointerWithin(args);
-        const trash = pointer.find((hit) => hit.id === "trash");
-        if (trash) return [trash];
+        const dock = pointer.find((hit) => hit.id === "archive-drop" || hit.id === "destroy-drop");
+        if (dock) return [dock];
         const partHit = pointer.find((hit) => String(hit.id).startsWith("part:"));
         if (partHit) return [partHit];
-        return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((container) => container.id !== "trash") });
+        return closestCenter({
+          ...args,
+          droppableContainers: args.droppableContainers.filter((container) => container.id !== "archive-drop" && container.id !== "destroy-drop"),
+        });
       }}
       onDragStart={(event: DragStartEvent) => setDraggingId(String(event.active.id))}
-      onDragOver={(event) => setOverTrash(event.over?.id === "trash")}
+      onDragOver={(event) => {
+        const id = event.over?.id;
+        setOverDrop(id === "archive-drop" || id === "destroy-drop" ? String(id) : null);
+      }}
       onDragEnd={onDragEnd}
-      onDragCancel={() => { setDraggingId(null); setOverTrash(false); }}
+      onDragCancel={() => { setDraggingId(null); setOverDrop(null); }}
     >
       <div className="manuscript-nav">
         <div className="nav-header">
@@ -103,13 +115,14 @@ export function ChapterTree({
               onRename={onRename}
               onDuplicate={onDuplicate}
               onArchive={onArchive}
+              onDestroy={onDestroy}
               onAdd={onAdd}
             />
           ))}
         </div>
       </div>
       {draggingId && <div className="dim-layer" />}
-      <TrashTarget active={overTrash} visible={!!draggingId} />
+      <DropDock visible={!!draggingId} overId={overDrop} />
       <DragOverlay>
         {dragging && <div className="nav-overlay">{dragging.title}</div>}
       </DragOverlay>
@@ -127,6 +140,7 @@ function PartBlock({
   onRename,
   onDuplicate,
   onArchive,
+  onDestroy,
   onAdd,
 }: {
   part: PartNav;
@@ -138,6 +152,7 @@ function PartBlock({
   onRename: (chapter: ChapterNav, title: string) => void;
   onDuplicate: (id: string) => void;
   onArchive: (chapter: ChapterNav) => void;
+  onDestroy: (chapter: ChapterNav) => void;
   onAdd: (partId: string, title?: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `part:${part.id}` });
@@ -185,6 +200,7 @@ function PartBlock({
               onRename={(title) => onRename(chapter, title)}
               onDuplicate={() => onDuplicate(chapter.id)}
               onArchive={() => onArchive(chapter)}
+              onDestroy={() => onDestroy(chapter)}
             />
           ))}
       </SortableContext>
@@ -201,6 +217,7 @@ function ChapterRow({
   onRename,
   onDuplicate,
   onArchive,
+  onDestroy,
 }: {
   chapter: ChapterNav;
   number: string | null;
@@ -209,6 +226,7 @@ function ChapterRow({
   onRename: (title: string) => void;
   onDuplicate: () => void;
   onArchive: () => void;
+  onDestroy: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: chapter.id });
   const [menu, setMenu] = useState(false);
@@ -226,19 +244,34 @@ function ChapterRow({
           <button type="submit">Rename</button>
           <button type="button" onClick={() => { onDuplicate(); setMenu(false); }}>Duplicate</button>
           <button type="button" onClick={() => { onArchive(); setMenu(false); }}>Archive</button>
+          <button type="button" onClick={() => { onDestroy(); setMenu(false); }}>Delete for good</button>
         </form>
       )}
     </div>
   );
 }
 
-function TrashTarget({ active, visible }: { active: boolean; visible: boolean }) {
-  const { setNodeRef } = useDroppable({ id: "trash" });
-  if (!visible) return <div ref={setNodeRef} className="pointer-events-none fixed h-px w-px opacity-0" />;
+function DropDock({ visible, overId }: { visible: boolean; overId: string | null }) {
+  const archive = useDroppable({ id: "archive-drop" });
+  const destroy = useDroppable({ id: "destroy-drop" });
+  if (!visible) {
+    return (
+      <>
+        <div ref={archive.setNodeRef} className="pointer-events-none fixed h-px w-px opacity-0" />
+        <div ref={destroy.setNodeRef} className="pointer-events-none fixed h-px w-px opacity-0" />
+      </>
+    );
+  }
   return (
-    <div ref={setNodeRef} className={`trash-target ${active ? "active" : ""}`}>
-      <p className="wordmark text-xl">Archive chapter</p>
-      <p className="mt-1 text-sm">Release to archive. The chapter stays recoverable.</p>
+    <div className="drop-dock">
+      <div ref={archive.setNodeRef} className={overId === "archive-drop" ? "drop-spot active" : "drop-spot"}>
+        <p>Archive</p>
+        <span>Keep it for later recovery</span>
+      </div>
+      <div ref={destroy.setNodeRef} className={overId === "destroy-drop" ? "drop-spot danger active" : "drop-spot danger"}>
+        <p>Delete for good</p>
+        <span>This cannot be undone</span>
+      </div>
     </div>
   );
 }

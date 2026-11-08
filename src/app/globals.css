@@ -244,27 +244,35 @@ button { cursor: pointer; }
 .footnote-chip { font-size: 0.75em; vertical-align: super; color: var(--accent); }
 
 .dim-layer { position: fixed; inset: 0; background: rgb(0 0 0 / 28%); z-index: 30; pointer-events: none; }
-.trash-target {
+.drop-dock {
   position: fixed;
   left: 50%;
-  top: 46%;
+  bottom: 28px;
   z-index: 40;
-  transform: translate(-50%, -50%);
-  width: min(280px, 70vw);
-  padding: 28px 20px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+}
+.drop-spot {
+  width: 220px;
+  padding: 18px 16px;
   text-align: center;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--card);
   color: var(--foreground);
 }
-.trash-target.active { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--card)); }
+.drop-spot p { margin: 0; font-size: 18px; }
+.drop-spot span { display: block; margin-top: 4px; font-size: 13px; color: var(--muted-foreground); }
+.drop-spot.active { border-color: #1d6fbf; background: color-mix(in srgb, #1d6fbf 14%, var(--card)); }
+.drop-spot.danger { border-color: var(--danger); }
+.drop-spot.danger.active { background: color-mix(in srgb, var(--danger) 16%, var(--card)); }
 
 .diff-added { background: color-mix(in srgb, #2f7d4a 22%, transparent); }
 .diff-removed { background: color-mix(in srgb, var(--danger) 18%, transparent); text-decoration: line-through; }
 
 @media (prefers-reduced-motion: reduce) {
-  .spine, .cover, .trash-target { transition: none; }
+  .spine, .cover, .drop-spot { transition: none; }
   .spine:hover, .cover:hover { transform: none; }
 }
 

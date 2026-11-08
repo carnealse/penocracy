@@ -26,6 +26,7 @@ export function EditorShell({ initial }: { initial: EditorData }) {
   const [leftOpen, setLeftOpen] = useState(preferences.leftOpen);
   const [rightOpen, setRightOpen] = useState(preferences.rightOpen);
   const [pendingArchive, setPendingArchive] = useState<ChapterNav | null>(null);
+  const [pendingDestroy, setPendingDestroy] = useState<ChapterNav | null>(null);
   const [undoArchive, setUndoArchive] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ serverContent: unknown; serverRevision: number } | null>(null);
   const [findOpen, setFindOpen] = useState(false);
@@ -243,6 +244,22 @@ export function EditorShell({ initial }: { initial: EditorData }) {
     setPendingArchive(null);
   }
 
+  async function confirmDestroy() {
+    if (!pendingDestroy) return;
+    const removedId = pendingDestroy.id;
+    setPendingDestroy(null);
+    const response = await fetch(`/api/chapters/${removedId}`, { method: "DELETE" });
+    if (!response.ok) {
+      setStatus("failed");
+      return;
+    }
+    const data = await refreshOutline();
+    if (chapter?.id === removedId) {
+      const next = data?.parts.flatMap((part) => part.chapters)[0];
+      if (next) await openChapter(next.id);
+    }
+  }
+
   const words = chapter ? wordCountDoc(isDoc(chapter.content) ? chapter.content : { type: "doc", content: [] }) : 0;
   const totalWords = parts.reduce((sum, part) => sum + part.chapters.reduce((inner, item) => inner + (item.id === chapter?.id ? words : item.wordCount), 0), 0);
   const bodyPart = parts.find((part) => part.kind === "BODY");
@@ -277,6 +294,7 @@ export function EditorShell({ initial }: { initial: EditorData }) {
             });
           }}
           onArchive={setPendingArchive}
+          onDestroy={setPendingDestroy}
           onRename={(item, title) => {
             setParts((current) => current.map((part) => ({ ...part, chapters: part.chapters.map((chapterItem) => chapterItem.id === item.id ? { ...chapterItem, title } : chapterItem) })));
             void fetch(`/api/chapters/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
@@ -434,6 +452,18 @@ export function EditorShell({ initial }: { initial: EditorData }) {
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setPendingArchive(null)}>Cancel</button>
               <button className="rounded-md bg-accent px-3 py-2 text-accent-foreground" onClick={() => void confirmArchive()}>Archive Chapter</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {pendingDestroy && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="destroy-title" className="w-full max-w-md rounded-2xl bg-card p-5">
+            <h2 id="destroy-title" className="wordmark text-2xl">Delete chapter for good?</h2>
+            <p className="mt-2">This does not archive “{pendingDestroy.title}” for later recovery. The chapter will be erased and cannot be undone.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setPendingDestroy(null)}>Cancel</button>
+              <button type="button" className="rounded-md bg-danger px-3 py-2 text-white" onClick={() => void confirmDestroy()}>Delete for good</button>
             </div>
           </div>
         </div>

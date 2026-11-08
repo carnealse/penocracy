@@ -1,5 +1,5 @@
 import { json } from "@/lib/http";
-import { getChapter, saveChapter, updateChapterMeta } from "@/server/manuscript";
+import { destroyChapter, getChapter, saveChapter, updateChapterMeta } from "@/server/manuscript";
 import { guard } from "@/server/guard";
 
 export async function GET(_request: Request, context: { params: Promise<{ chapterId: string }> }) {
@@ -16,6 +16,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ chapt
       return json(result, result.status === "conflict" ? 409 : 200);
     }
     await updateChapterMeta(userId, chapterId, body);
+    return json({ ok: true });
+  });
+}
+
+export async function DELETE(_request: Request, context: { params: Promise<{ chapterId: string }> }) {
+  const { chapterId } = await context.params;
+  return guard(async (userId) => {
+    await destroyChapter(userId, chapterId);
     return json({ ok: true });
   });
 }
