@@ -8,11 +8,15 @@ import type { Preferences } from "@/lib/preferences";
 export function WritingSurface({
   content,
   preferences,
+  title,
+  number,
   onReady,
   onUpdate,
 }: {
   content: unknown;
   preferences: Preferences;
+  title: string;
+  number: string | null;
   onReady: (editor: Editor) => void;
   onUpdate: (editor: Editor) => void;
 }) {
@@ -54,6 +58,8 @@ export function WritingSurface({
         ["--paragraph-space" as string]: `${preferences.paragraphSpacing}px`,
       }}
     >
+      {number && <p className="chapter-kicker">{number}</p>}
+      <h1 className="chapter-heading">{title}</h1>
       <EditorContent editor={editor} />
     </article>
   );

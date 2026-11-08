@@ -191,15 +191,39 @@ export function EditorShell({ initial }: { initial: EditorData }) {
     if (local && !local.synced) void flush();
   }
 
-  async function addChapter(partId?: string) {
+  async function refreshOutline() {
+    const response = await fetch(`/api/books/${initial.id}`);
+    if (!response.ok) return null;
+    const data = (await response.json()) as EditorData;
+    setParts(data.parts);
+    return data;
+  }
+
+  async function addChapter(partId?: string, title?: string) {
     await flush();
     const response = await fetch(`/api/books/${initial.id}/chapters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ partId }),
+      body: JSON.stringify({ partId, title }),
     });
     const payload = await response.json();
-    if (response.ok) router.refresh();
+    if (!response.ok) {
+      setStatus("failed");
+      return;
+    }
+    await refreshOutline();
+    if (payload.id) await openChapter(payload.id);
+  }
+
+  async function duplicateChapter(chapterId: string) {
+    await flush();
+    const response = await fetch(`/api/chapters/${chapterId}/duplicate`, { method: "POST" });
+    const payload = await response.json();
+    if (!response.ok) {
+      setStatus("failed");
+      return;
+    }
+    await refreshOutline();
     if (payload.id) await openChapter(payload.id);
   }
 
@@ -220,6 +244,12 @@ export function EditorShell({ initial }: { initial: EditorData }) {
   }
 
   const words = chapter ? wordCountDoc(isDoc(chapter.content) ? chapter.content : { type: "doc", content: [] }) : 0;
+  const totalWords = parts.reduce((sum, part) => sum + part.chapters.reduce((inner, item) => inner + (item.id === chapter?.id ? words : item.wordCount), 0), 0);
+  const bodyPart = parts.find((part) => part.kind === "BODY");
+  const chapterNumber = bodyPart && chapter ? (() => {
+    const index = bodyPart.chapters.findIndex((item) => item.id === chapter.id);
+    return index >= 0 ? String(index + 1) : null;
+  })() : null;
   const issues = useMemo(() => (chapter && isDoc(chapter.content) ? reviewDocument(chapter.content) : []), [chapter]);
   const statusLabel: Record<SaveState, string> = {
     "saved-local": "Saved locally",
@@ -232,14 +262,11 @@ export function EditorShell({ initial }: { initial: EditorData }) {
 
   return (
     <div className="editor-shell" style={{ gridTemplateColumns: `${leftOpen && !preferences.distractionFree ? `${preferences.leftWidth}px` : "0px"} 1fr ${rightOpen && !preferences.distractionFree && !preferences.focusMode ? `${preferences.rightWidth}px` : "0px"}` }}>
-      <aside className="panel overflow-hidden border-r" hidden={!leftOpen || preferences.distractionFree}>
-        <div className="flex items-center justify-between px-3 py-2">
-          <Link href="/" className="wordmark text-lg">Penocracy</Link>
-          <a href={`/books/${initial.id}/export`} className="text-sm">Export</a>
-        </div>
+      <aside className="manuscript-aside" hidden={!leftOpen || preferences.distractionFree}>
         <ChapterTree
           parts={parts}
           activeId={chapter?.id ?? null}
+          authorName={initial.authorName}
           onOpen={(id) => void openChapter(id)}
           onReorder={(next) => {
             setParts(next);
@@ -254,29 +281,42 @@ export function EditorShell({ initial }: { initial: EditorData }) {
             setParts((current) => current.map((part) => ({ ...part, chapters: part.chapters.map((chapterItem) => chapterItem.id === item.id ? { ...chapterItem, title } : chapterItem) })));
             void fetch(`/api/chapters/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
           }}
-          onAdd={(partId) => void addChapter(partId)}
-          onDuplicate={(id) => void fetch(`/api/chapters/${id}/duplicate`, { method: "POST" }).then(() => router.refresh())}
+          onAdd={(partId, title) => void addChapter(partId, title)}
+          onDuplicate={(id) => void duplicateChapter(id)}
         />
       </aside>
-      <section className="relative overflow-auto" style={{ paddingTop: preferences.typewriter ? "30vh" : undefined }}>
-        <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-4 py-2 text-sm backdrop-blur">
-          <div>
-            <p className="wordmark text-lg leading-none">{initial.title}</p>
-            <p className="text-muted-foreground">{chapter?.title} · {statusLabel[status]}</p>
+      <section className="editor-stage" style={{ paddingTop: preferences.typewriter ? "30vh" : undefined }}>
+        <header className="editor-stats">
+          <div className="editor-stats-title">
+            <Link href="/">Library</Link>
+            <strong>{initial.title}</strong>
+            <span>{chapter?.title} · {statusLabel[status]}</span>
           </div>
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <span>{words} words</span>
+          <div className="editor-stats-figures">
+            <span>{words.toLocaleString()} words</span>
+            <span>{totalWords.toLocaleString()} in the book</span>
             {selectionWords > 0 && <span>{selectionWords} selected</span>}
-            {preferences.showReadingTime && <span>{Math.max(1, Math.round(words / 250))} min</span>}
-            <button onClick={() => setLeftOpen((open) => !open)}>Left</button>
-            <button onClick={() => setRightOpen((open) => !open)}>Right</button>
-            <button onClick={() => setPreferences((current) => ({ ...current, distractionFree: !current.distractionFree }))}>Focus</button>
+            {preferences.showReadingTime && <span>{Math.max(1, Math.round(totalWords / 250))} min</span>}
+            {preferences.goalWords ? <span>{words} / {preferences.goalWords}</span> : null}
+            <Link href={`/books/${initial.id}/export`}>Export</Link>
+            <button type="button" onClick={() => setLeftOpen((open) => !open)}>Nav</button>
+            <button type="button" onClick={() => setRightOpen((open) => !open)}>Tools</button>
+            <button type="button" onClick={() => setPreferences((current) => ({ ...current, distractionFree: !current.distractionFree }))}>Focus</button>
           </div>
         </header>
-        {chapter && <WritingSurface content={chapter.content} preferences={preferences} onReady={onReady} onUpdate={onUpdate} />}
-        {preferences.goalWords && <p className="mx-auto max-w-3xl px-8 pb-8 text-sm text-muted-foreground">{words} / {preferences.goalWords} words</p>}
+        {chapter && (
+          <WritingSurface
+            key={chapter.id}
+            content={chapter.content}
+            preferences={preferences}
+            title={chapter.title}
+            number={chapterNumber}
+            onReady={onReady}
+            onUpdate={onUpdate}
+          />
+        )}
       </section>
-      <aside className="panel overflow-auto border-l p-3" hidden={!rightOpen || preferences.distractionFree || preferences.focusMode}>
+      <aside className="tool-panel" hidden={!rightOpen || preferences.distractionFree || preferences.focusMode}>
         <div className="mb-3 flex flex-wrap gap-2 text-sm">
           {(["format", "review", "document", "history", "preferences"] as const).map((item) => (
             <button key={item} className={tab === item ? "font-semibold" : "text-muted-foreground"} onClick={() => setTab(item)}>{item}</button>
@@ -321,7 +361,6 @@ export function EditorShell({ initial }: { initial: EditorData }) {
         )}
         {tab === "document" && (
           <div className="grid gap-2 text-sm">
-            <p>{initial.totalWords} words in the manuscript.</p>
             <p><a href={`/books/${initial.id}/archive`}>Open Archive & History</a></p>
             {(findOpen || true) && (
               <>
@@ -401,7 +440,7 @@ export function EditorShell({ initial }: { initial: EditorData }) {
       )}
       {undoArchive && (
         <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full bg-card px-4 py-2 shadow-none border border-border">
-          Chapter archived. <button onClick={async () => { await fetch(`/api/archive/${undoArchive}/restore`, { method: "POST" }); setUndoArchive(null); router.refresh(); }}>Undo</button>
+          Chapter archived. <button type="button" onClick={async () => { await fetch(`/api/archive/${undoArchive}/restore`, { method: "POST" }); setUndoArchive(null); await refreshOutline(); }}>Undo</button>
         </div>
       )}
       {conflict && (
