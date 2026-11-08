@@ -14,7 +14,7 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-Copy `.env.example` to `.env`. `DATABASE_URL` is the pooled application connection. `DIRECT_URL` is the direct connection Prisma uses for migrations. On Vercel those should be Neon’s pooled and direct strings. The production build does not connect to the database. Set `DATABASE_URL`, `DIRECT_URL`, and `AUTH_SECRET` on the Vercel project so the running app can.
+Copy `.env.example` to `.env` for local development. On Vercel, the Neon integration sets `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct). The build applies migrations when either of those, or `DIRECT_URL`, is present. Set `AUTH_SECRET` and `AUTH_TRUST_HOST=true` in the Vercel project as well.
 
 `EXPORT_MODE=inline` compiles PDF, EPUB, and DOCX inside the Next.js server after the request returns a job id. Production should run `export-worker/Dockerfile` with `EXPORT_MODE=worker`. The worker claims rows from `export_jobs`. Set `BLOB_READ_WRITE_TOKEN` on Vercel so finished files are not left on the ephemeral disk. Without that token, files are stored in PostgreSQL.
 
