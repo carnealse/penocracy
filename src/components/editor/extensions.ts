@@ -96,7 +96,20 @@ export function editorExtensions() {
     Link.configure({ openOnClick: false, autolink: true }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Typography,
-    Placeholder.configure({ placeholder: "Begin the chapter…" }),
+    Placeholder.configure({
+      showOnlyCurrent: false,
+      placeholder: ({ editor, node, pos }) => {
+        if (node.type.name !== "paragraph") return "";
+        if (editor.state.doc.textContent.trim().length > 0) return "";
+        let first = true;
+        editor.state.doc.descendants((child, childPos) => {
+          if (child.type.name !== "paragraph") return true;
+          first = childPos === pos;
+          return false;
+        });
+        return first ? "Begin the chapter…" : "";
+      },
+    }),
     Scene,
     SceneBreak,
     Footnote,
