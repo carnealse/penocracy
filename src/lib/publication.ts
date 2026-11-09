@@ -109,7 +109,7 @@ export function blocksFromDoc(doc: PMDoc): Block[] {
   return applyParagraphLayout(blocks);
 }
 
-/** First paragraph of a chapter, and the first paragraph after an explicit scene break, are flush. A blank line does not change the indent of the paragraph after it. */
+/** The first paragraph of a chapter, the paragraph after a scene break, and the paragraph after a blank line start at the left margin. */
 export function applyParagraphLayout(blocks: Block[]): Block[] {
   let suppressIndent = true;
   return blocks.map((block) => {
@@ -120,7 +120,8 @@ export function applyParagraphLayout(blocks: Block[]): Block[] {
     if (block.type !== "paragraph") return block;
     const blank = inlineText(block.inlines).trim().length === 0;
     const indent = !suppressIndent && !blank;
-    if (suppressIndent) suppressIndent = false;
+    if (blank) suppressIndent = true;
+    else if (suppressIndent) suppressIndent = false;
     return { ...block, blank, indent };
   });
 }

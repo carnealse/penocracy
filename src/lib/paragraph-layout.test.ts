@@ -18,24 +18,24 @@ function flags(blocks: Block[]) {
 }
 
 describe("novel paragraph layout", () => {
-  it("indents every paragraph after the first and keeps a blank line from removing that indent", () => {
+  it("indents a paragraph after text and starts the paragraph after a blank line at the margin", () => {
     const blocks = blocksFromDoc(chapter([
       paragraph("First"),
       paragraph("Second"),
       paragraph(""),
       paragraph("After blank"),
     ]));
-    expect(flags(blocks)).toEqual(["flush:First", "indent:Second", "blank:", "indent:After blank"]);
+    expect(flags(blocks)).toEqual(["flush:First", "indent:Second", "blank:", "flush:After blank"]);
   });
 
-  it("removes indent only for the paragraph that follows an explicit scene break", () => {
+  it("keeps the paragraph after a blank line flush even when a scene break came earlier", () => {
     const blocks = blocksFromDoc(chapter([
       paragraph("Opening"),
       { type: "sceneBreak" },
       paragraph("After scene"),
       paragraph(""),
-      paragraph("Still indented"),
+      paragraph("After the blank"),
     ]));
-    expect(flags(blocks)).toEqual(["flush:Opening", "sceneBreak", "flush:After scene", "blank:", "indent:Still indented"]);
+    expect(flags(blocks)).toEqual(["flush:Opening", "sceneBreak", "flush:After scene", "blank:", "flush:After the blank"]);
   });
 });

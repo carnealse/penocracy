@@ -247,7 +247,11 @@ button { cursor: pointer; }
 .writing-prose h1 + p,
 .writing-prose h2 + p,
 .writing-prose h3 + p,
-.writing-prose li p {
+.writing-prose li p,
+.writing-prose p:empty,
+.writing-prose p:has(> br:only-child),
+.writing-prose p:empty + p,
+.writing-prose p:has(> br:only-child) + p {
   text-indent: 0;
 }
 .writing-prose p.is-empty::before { content: attr(data-placeholder); color: #9aa6ae; float: left; height: 0; pointer-events: none; text-indent: 0; }
